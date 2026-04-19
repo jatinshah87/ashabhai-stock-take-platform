@@ -149,8 +149,16 @@ JWT_SECRET=change-this-for-production
 JWT_EXPIRES_IN=8h
 PORT=4000
 FRONTEND_URL=http://localhost:3000
+FRONTEND_URLS=http://localhost:3000
 AUTH_DEV_BYPASS=true
 DEFAULT_USER_PASSWORD=ChangeMe@123
+```
+
+For production hosting, set `FRONTEND_URLS` to a comma-separated list of allowed frontend origins.
+Example:
+
+```env
+FRONTEND_URLS=https://ashabhai-stock-take-platform.vercel.app,https://your-custom-domain.com
 ```
 
 ## Database migration and seed steps
