@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 96%;
+    --foreground: 216 45% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 216 45% 16%;
+    --primary: 216 63% 25%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 214 28% 93%;
+    --secondary-foreground: 216 45% 22%;
+    --muted: 214 30% 95%;
+    --muted-foreground: 214 21% 45%;
+    --accent: 355 68% 44%;
+    --accent-foreground: 210 40% 98%;
+    --border: 214 26% 85%;
+    --input: 214 26% 88%;
+    --ring: 216 63% 25%;
+    --success: 153 76% 31%;
+    --warning: 40 83% 44%;
+    --danger: 355 68% 44%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-background bg-hero-grid font-sans text-foreground antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display tracking-[-0.03em] text-foreground;
+  }
+}
+
+@layer components {
+  .surface-panel {
+    @apply rounded-[28px] border border-white/60 bg-white/95 shadow-panel backdrop-blur;
+  }
+
+  .surface-subtle {
+    @apply rounded-3xl border bg-white/80 shadow-soft;
+  }
+
+  .page-shell {
+    @apply flex min-h-screen bg-transparent;
+  }
+
+  .metric-kpi {
+    @apply text-4xl font-display font-semibold tracking-[-0.05em] text-foreground;
+  }
+
+  .tablet-grid {
+    @apply grid gap-6 xl:grid-cols-12;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold text-foreground;
+  }
+
+  .section-copy {
+    @apply text-sm leading-6 text-muted-foreground;
+  }
+}

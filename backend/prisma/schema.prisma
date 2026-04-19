@@ -1,0 +1,543 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CountType {
+  FIRST
+  SECOND
+}
+
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+}
+
+enum ImportJobStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL_SUCCESS
+  FAILED
+}
+
+enum ImportType {
+  WAREHOUSE
+  SITE
+  LOCATION
+  ITEM
+  ITEM_BARCODE
+  ITEM_UOM
+  STOCK_SNAPSHOT
+}
+
+enum ImportRecordStatus {
+  INSERTED
+  UPDATED
+  SKIPPED
+  FAILED
+}
+
+enum SyncStatus {
+  PENDING
+  PROCESSED
+  FAILED
+  CONFLICT
+  RESOLVED
+  SKIPPED
+}
+
+enum SyncActionType {
+  CREATE
+  UPDATE
+  DELETE
+  SUBMIT
+}
+
+enum ConflictType {
+  DUPLICATE_LINE
+  PLAN_LOCKED
+  SERVER_STATE_MISMATCH
+  SUBMISSION_CONFLICT
+  OUT_OF_SCOPE
+  INVALID_REFERENCE
+}
+
+enum ConflictStatus {
+  OPEN
+  RESOLVED
+  REVIEW_REQUIRED
+  REJECTED
+}
+
+enum ConflictResolutionAction {
+  KEEP_LOCAL
+  KEEP_SERVER
+  MARK_REVIEW
+  RETRY_REPLAY
+  REJECTED
+}
+
+enum AnomalyType {
+  HIGH_VARIANCE
+  EXTREME_MISMATCH
+  FIRST_SECOND_MISMATCH
+  UOM_CONSISTENCY
+  REPEATED_USER_VARIANCE
+  RAPID_COUNTING
+  REPEATED_SYNC_CONFLICT
+  DATA_FRESHNESS
+}
+
+enum AnomalySeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AnomalyStatus {
+  OPEN
+  REVIEWED
+  CLOSED
+}
+
+model Role {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+}
+
+model User {
+  id                 String                @id @default(cuid())
+  employeeCode       String                @unique
+  name               String
+  email              String                @unique
+  passwordHash       String
+  phone              String
+  status             String
+  roleId             String
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  role               Role                  @relation(fields: [roleId], references: [id])
+  warehouseAccesses  UserWarehouseAccess[]
+  siteAccesses       UserSiteAccess[]
+  firstCountPlans    StockTakePlan[]       @relation("PlanFirstCountUser")
+  secondCountPlans   StockTakePlan[]       @relation("PlanSecondCountUser")
+  countEntries       CountEntry[]
+  countSubmissions   CountSubmission[]
+  auditLogs          AuditLog[]            @relation("AuditActorUser")
+  importJobs         ImportJob[]           @relation("ImportActorUser")
+  syncQueues         SyncQueue[]           @relation("SyncQueueUser")
+  resolvedConflicts  SyncConflict[]        @relation("SyncConflictResolvedBy")
+  anomalies          Anomaly[]             @relation("AnomalyUser")
+  reviewedAnomalies  Anomaly[]             @relation("AnomalyReviewedBy")
+}
+
+model Warehouse {
+  id             String               @id @default(cuid())
+  code           String               @unique
+  name           String
+  city           String
+  region         String
+  status         String
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  sites          Site[]
+  userAccesses   UserWarehouseAccess[]
+  stockTakePlans StockTakePlan[]
+  locations      Location[]
+  stockSnapshots StockSnapshot[]
+  countEntries   CountEntry[]
+  syncQueues     SyncQueue[]
+  anomalies      Anomaly[]
+}
+
+model Site {
+  id               String               @id @default(cuid())
+  warehouseId      String
+  code             String
+  name             String
+  type             String
+  manager          String
+  status           String
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  warehouse        Warehouse            @relation(fields: [warehouseId], references: [id])
+  locations        Location[]
+  userAccesses     UserSiteAccess[]
+  stockTakePlanSites StockTakePlanSite[]
+  stockSnapshots   StockSnapshot[]
+  countEntries     CountEntry[]
+  syncQueues       SyncQueue[]
+  anomalies        Anomaly[]
+
+  @@unique([warehouseId, code])
+}
+
+model Location {
+  id                String                   @id @default(cuid())
+  warehouseId       String
+  siteId            String
+  code              String
+  name              String
+  aisle             String
+  zone              String
+  barcode           String                   @unique
+  status            String
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  warehouse         Warehouse                @relation(fields: [warehouseId], references: [id])
+  site              Site                     @relation(fields: [siteId], references: [id])
+  stockTakePlanLocations StockTakePlanLocation[]
+  stockSnapshots    StockSnapshot[]
+  countEntries      CountEntry[]
+  syncQueues        SyncQueue[]
+  syncConflicts     SyncConflict[]
+  anomalies         Anomaly[]
+
+  @@unique([siteId, code])
+}
+
+model Item {
+  id             String          @id @default(cuid())
+  code           String          @unique
+  description    String
+  status         String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  barcodes       ItemBarcode[]
+  uoms           ItemUOM[]
+  stockSnapshots StockSnapshot[]
+  countEntries   CountEntry[]
+  syncQueues     SyncQueue[]
+  syncConflicts  SyncConflict[]
+  anomalies      Anomaly[]
+}
+
+model ItemBarcode {
+  id        String   @id @default(cuid())
+  itemId     String
+  barcode   String   @unique
+  uomCode   String?
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+}
+
+model ItemUOM {
+  id               String          @id @default(cuid())
+  itemId           String
+  uomCode          String
+  conversionFactor Decimal         @db.Decimal(18, 4)
+  isBase           Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  item             Item            @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  stockSnapshots   StockSnapshot[]
+  countEntries     CountEntry[]
+  syncQueues       SyncQueue[]
+  syncConflicts    SyncConflict[]
+
+  @@unique([itemId, uomCode])
+}
+
+model StockSnapshot {
+  id           String    @id @default(cuid())
+  warehouseId  String
+  siteId       String
+  locationId   String
+  itemId       String
+  itemUomId    String
+  quantity     Decimal   @db.Decimal(18, 4)
+  snapshotAt   DateTime
+  sourceReference String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  site         Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  location     Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  item         Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  itemUom      ItemUOM   @relation(fields: [itemUomId], references: [id], onDelete: Cascade)
+
+  @@index([warehouseId, siteId, locationId])
+  @@index([itemId, snapshotAt])
+  @@unique([warehouseId, siteId, locationId, itemId, itemUomId, snapshotAt])
+}
+
+model UserWarehouseAccess {
+  id          String    @id @default(cuid())
+  userId      String
+  warehouseId String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, warehouseId])
+}
+
+model UserSiteAccess {
+  id        String   @id @default(cuid())
+  userId    String
+  siteId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, siteId])
+}
+
+model StockTakePlan {
+  id                      String                  @id @default(cuid())
+  code                    String                  @unique
+  name                    String
+  description             String
+  warehouseId             String
+  scheduledDate           DateTime
+  scheduleWindow          String
+  firstCountUserId        String
+  secondCountUserId       String
+  notes                   String
+  instructions            String
+  countMethod             String
+  locked                  Boolean                 @default(false)
+  highVariancePlaceholder Boolean                 @default(false)
+  status                  String
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  warehouse               Warehouse               @relation(fields: [warehouseId], references: [id])
+  firstCountUser          User                    @relation("PlanFirstCountUser", fields: [firstCountUserId], references: [id])
+  secondCountUser         User                    @relation("PlanSecondCountUser", fields: [secondCountUserId], references: [id])
+  sites                   StockTakePlanSite[]
+  locations               StockTakePlanLocation[]
+  countEntries            CountEntry[]
+  countSubmissions        CountSubmission[]
+  syncQueues              SyncQueue[]
+  syncConflicts           SyncConflict[]
+  anomalies               Anomaly[]
+}
+
+model StockTakePlanSite {
+  id        String        @id @default(cuid())
+  planId    String
+  siteId    String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  plan      StockTakePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  site      Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, siteId])
+}
+
+model StockTakePlanLocation {
+  id         String        @id @default(cuid())
+  planId     String
+  locationId String
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  plan       StockTakePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  location   Location      @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, locationId])
+}
+
+model CountEntry {
+  id            String     @id @default(cuid())
+  planId         String
+  countType     CountType
+  warehouseId   String
+  siteId        String
+  locationId    String
+  itemId        String
+  itemUomId     String
+  countedQty    Decimal    @db.Decimal(18, 4)
+  countedByUserId String
+  countedAt     DateTime
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  plan          StockTakePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  warehouse     Warehouse  @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  site          Site       @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  location      Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  item          Item       @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  itemUom       ItemUOM    @relation(fields: [itemUomId], references: [id], onDelete: Cascade)
+  countedByUser User       @relation(fields: [countedByUserId], references: [id], onDelete: Cascade)
+  anomalies     Anomaly[]
+
+  @@unique([planId, countType, locationId, itemId])
+  @@index([planId, countType])
+}
+
+model CountSubmission {
+  id               String           @id @default(cuid())
+  planId           String
+  countType        CountType
+  status           SubmissionStatus @default(DRAFT)
+  submittedByUserId String?
+  submittedAt      DateTime?
+  notes            String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  plan             StockTakePlan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  submittedByUser  User?            @relation(fields: [submittedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([planId, countType])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  actorUser   User?    @relation("AuditActorUser", fields: [actorUserId], references: [id])
+}
+
+model ImportJob {
+  id             String            @id @default(cuid())
+  importType     ImportType
+  sourceSystem   String
+  sourceLabel    String?
+  status         ImportJobStatus
+  totalRecords   Int
+  insertedCount  Int               @default(0)
+  updatedCount   Int               @default(0)
+  skippedCount   Int               @default(0)
+  failedCount    Int               @default(0)
+  startedAt      DateTime          @default(now())
+  completedAt    DateTime?
+  actorUserId    String?
+  metadata       Json?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  actorUser      User?             @relation("ImportActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+  details        ImportJobDetail[]
+
+  @@index([importType, startedAt])
+}
+
+model ImportJobDetail {
+  id          String             @id @default(cuid())
+  importJobId String
+  recordIndex Int
+  externalKey String?
+  status      ImportRecordStatus
+  message     String?
+  payload     Json?
+  createdAt   DateTime           @default(now())
+  importJob   ImportJob          @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+
+  @@index([importJobId, status])
+}
+
+model SyncQueue {
+  id                String         @id @default(cuid())
+  planId            String
+  countType         CountType
+  warehouseId       String?
+  siteId            String?
+  locationId        String?
+  itemId            String?
+  itemUomId         String?
+  uomCode           String?
+  countedQuantity   Decimal?       @db.Decimal(18, 4)
+  actionType        SyncActionType
+  clientEntryId     String
+  deviceId          String
+  clientTimestamp   DateTime
+  serverProcessedAt DateTime?
+  syncStatus        SyncStatus     @default(PENDING)
+  errorMessage      String?
+  userId            String
+  payloadSnapshot   Json?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  plan              StockTakePlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  warehouse         Warehouse?     @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+  site              Site?          @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  location          Location?      @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  item              Item?          @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  itemUom           ItemUOM?       @relation(fields: [itemUomId], references: [id], onDelete: SetNull)
+  user              User           @relation("SyncQueueUser", fields: [userId], references: [id], onDelete: Cascade)
+  conflicts         SyncConflict[]
+
+  @@unique([deviceId, clientEntryId, actionType])
+  @@index([userId, syncStatus])
+  @@index([planId, countType, actionType])
+}
+
+model SyncConflict {
+  id               String                    @id @default(cuid())
+  syncQueueId      String?
+  planId           String
+  countType        CountType
+  locationId       String?
+  itemId           String?
+  itemUomId        String?
+  uomCode          String?
+  localValue       Json
+  serverValue      Json?
+  conflictType     ConflictType
+  status           ConflictStatus           @default(OPEN)
+  resolutionAction ConflictResolutionAction?
+  resolvedById     String?
+  resolvedAt       DateTime?
+  notes            String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  syncQueue        SyncQueue?               @relation(fields: [syncQueueId], references: [id], onDelete: SetNull)
+  plan             StockTakePlan            @relation(fields: [planId], references: [id], onDelete: Cascade)
+  location         Location?                @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  item             Item?                    @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  itemUom          ItemUOM?                 @relation(fields: [itemUomId], references: [id], onDelete: SetNull)
+  resolvedBy       User?                    @relation("SyncConflictResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([status, conflictType])
+  @@index([planId, countType])
+}
+
+model Anomaly {
+  id                  String           @id @default(cuid())
+  fingerprint         String           @unique
+  anomalyType         AnomalyType
+  severity            AnomalySeverity
+  status              AnomalyStatus    @default(OPEN)
+  planId              String?
+  warehouseId         String?
+  siteId              String?
+  locationId          String?
+  itemId              String?
+  userId              String?
+  relatedCountEntryId String?
+  summary             String
+  details             Json?
+  notes               String?
+  detectedAt          DateTime         @default(now())
+  reviewedById        String?
+  reviewedAt          DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  plan                StockTakePlan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+  warehouse           Warehouse?       @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+  site                Site?            @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  location            Location?        @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  item                Item?            @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  user                User?            @relation("AnomalyUser", fields: [userId], references: [id], onDelete: SetNull)
+  relatedCountEntry   CountEntry?      @relation(fields: [relatedCountEntryId], references: [id], onDelete: SetNull)
+  reviewedBy          User?            @relation("AnomalyReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, severity])
+  @@index([anomalyType, detectedAt])
+  @@index([planId, warehouseId, siteId])
+}

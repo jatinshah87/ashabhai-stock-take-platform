@@ -1,0 +1,147 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { LoaderCircle } from "lucide-react";
+import { PageHeader } from "@/components/layout/page-header";
+import { ErrorState } from "@/components/shared/error-state";
+import { SectionCard } from "@/components/shared/section-card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { getAnomaly, reviewAnomaly } from "@/lib/services/anomalies";
+import { AnomalyDetail } from "@/lib/types";
+
+export function AnomalyDetailClient({ anomalyId }: { anomalyId: string }) {
+  const [anomaly, setAnomaly] = useState<AnomalyDetail | null>(null);
+  const [notes, setNotes] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadData() {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const detail = await getAnomaly(anomalyId);
+      setAnomaly(detail);
+      setNotes(detail.notes ?? "");
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Unable to load anomaly detail.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadData();
+  }, [anomalyId]);
+
+  async function handleReview(status: "OPEN" | "REVIEWED" | "CLOSED") {
+    setIsSaving(true);
+    try {
+      await reviewAnomaly(anomalyId, { status, notes });
+      await loadData();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Unable to update anomaly review.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <SectionCard title="Loading anomaly detail">
+        <div className="flex min-h-[260px] items-center justify-center">
+          <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </SectionCard>
+    );
+  }
+
+  if (error || !anomaly) {
+    return <ErrorState title="Unable to load anomaly" description={error ?? "Anomaly detail is unavailable."} onRetry={loadData} />;
+  }
+
+  return (
+    <div className="grid gap-6">
+      <PageHeader
+        title="Anomaly detail"
+        description="Review the exception context, supporting evidence, and audit notes before marking the anomaly reviewed or closed."
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => handleReview("REVIEWED")} disabled={isSaving}>
+              Mark reviewed
+            </Button>
+            <Button onClick={() => handleReview("CLOSED")} disabled={isSaving}>
+              Close anomaly
+            </Button>
+          </>
+        }
+      />
+
+      <div className="grid gap-4 xl:grid-cols-4">
+        <div className="rounded-[28px] border border-border/70 bg-white p-6 shadow-soft">
+          <div className="text-sm font-semibold text-muted-foreground">Severity</div>
+          <div className="mt-4"><Badge variant={anomaly.severity === "CRITICAL" || anomaly.severity === "HIGH" ? "danger" : anomaly.severity === "MEDIUM" ? "warning" : "outline"}>{anomaly.severity}</Badge></div>
+        </div>
+        <div className="rounded-[28px] border border-border/70 bg-white p-6 shadow-soft">
+          <div className="text-sm font-semibold text-muted-foreground">Status</div>
+          <div className="mt-4"><Badge variant={anomaly.status === "OPEN" ? "danger" : anomaly.status === "REVIEWED" ? "warning" : "success"}>{anomaly.status}</Badge></div>
+        </div>
+        <div className="rounded-[28px] border border-border/70 bg-white p-6 shadow-soft">
+          <div className="text-sm font-semibold text-muted-foreground">Type</div>
+          <div className="mt-4 text-lg font-semibold">{anomaly.anomalyType.replace(/_/g, " ")}</div>
+        </div>
+        <div className="rounded-[28px] border border-border/70 bg-white p-6 shadow-soft">
+          <div className="text-sm font-semibold text-muted-foreground">Detected</div>
+          <div className="mt-4 text-lg font-semibold">{new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(anomaly.detectedAt))}</div>
+        </div>
+      </div>
+
+      <SectionCard title="Anomaly summary" description={anomaly.summary}>
+        <div className="grid gap-3 text-sm text-muted-foreground">
+          <div>Plan: {anomaly.context.planCode ?? "-"}</div>
+          <div>Warehouse: {anomaly.context.warehouseName ?? "-"}</div>
+          <div>Site: {anomaly.context.siteCode ?? "-"}</div>
+          <div>Location: {anomaly.context.locationCode ?? "-"}</div>
+          <div>Item: {anomaly.context.itemCode ?? "-"}</div>
+          <div>User: {anomaly.context.userName ?? "-"}</div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Evidence detail" description="Structured anomaly payload generated by the rules engine.">
+        <pre className="overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
+{JSON.stringify(anomaly.details, null, 2)}
+        </pre>
+      </SectionCard>
+
+      {anomaly.relatedCountEntry ? (
+        <SectionCard title="Related count entry" description="Linked stock take line that contributed directly to this anomaly.">
+          <div className="grid gap-2 text-sm text-muted-foreground">
+            <div>Count type: {anomaly.relatedCountEntry.countType}</div>
+            <div>Quantity: {anomaly.relatedCountEntry.countedQty} {anomaly.relatedCountEntry.uomCode}</div>
+            <div>Counted by: {anomaly.relatedCountEntry.countedByName}</div>
+            <div>Counted at: {new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(anomaly.relatedCountEntry.countedAt))}</div>
+          </div>
+        </SectionCard>
+      ) : null}
+
+      <SectionCard title="Review notes" description="Add audit notes, closure rationale, or reopen comments.">
+        <div className="grid gap-4">
+          <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={6} />
+          <div className="flex flex-wrap gap-3">
+            <Button variant="secondary" onClick={() => handleReview("OPEN")} disabled={isSaving}>
+              Reopen
+            </Button>
+            <Button variant="secondary" onClick={() => handleReview("REVIEWED")} disabled={isSaving}>
+              Save as reviewed
+            </Button>
+            <Button onClick={() => handleReview("CLOSED")} disabled={isSaving}>
+              Save and close
+            </Button>
+          </div>
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
