@@ -1,6 +1,9 @@
-import { ValidationPipe } from "@nestjs/common";
+import { Logger, ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { ConfigService } from "@nestjs/config";
+import { randomUUID } from "crypto";
+import { NextFunction, Request, Response } from "express";
+import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
@@ -8,10 +11,11 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const port = Number(config.get("PORT", 4000));
   const allowedOrigins = buildAllowedOrigins(config);
+  const logger = new Logger("Bootstrap");
 
   app.setGlobalPrefix("api");
   app.enableCors({
-    origin(origin, callback) {
+    origin(origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) {
       if (!origin || isOriginAllowed(origin, allowedOrigins)) {
         callback(null, true);
         return;
@@ -21,16 +25,32 @@ async function bootstrap() {
     },
     credentials: true,
   });
+  app.use((request: Request, response: Response, next: NextFunction) => {
+    const requestId = request.headers["x-request-id"] ?? randomUUID();
+    response.setHeader("x-request-id", requestId);
+    next();
+  });
+  app.use((request: Request, response: Response, next: NextFunction) => {
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.setHeader("X-Frame-Options", "DENY");
+    response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    response.setHeader("Permissions-Policy", "microphone=(self)");
+    next();
+  });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
     }),
   );
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   await app.listen(port);
-  console.log(`Ashabhai backend listening on http://localhost:${port}/api`);
+  logger.log(`Ashabhai backend listening on http://localhost:${port}/api`);
 }
 
 bootstrap();

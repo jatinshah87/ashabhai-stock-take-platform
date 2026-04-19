@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SessionGate } from "@/components/auth/session-gate";
 import { AppShell } from "@/components/layout/app-shell";
 
 export default function PlatformLayout({
@@ -6,5 +7,9 @@ export default function PlatformLayout({
 }: {
   children: ReactNode;
 }) {
-  return <AppShell>{children}</AppShell>;
+  return (
+    <SessionGate>
+      <AppShell>{children}</AppShell>
+    </SessionGate>
+  );
 }

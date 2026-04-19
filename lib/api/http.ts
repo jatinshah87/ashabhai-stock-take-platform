@@ -1,5 +1,6 @@
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:4000/api";
+const API_BASE_LABEL = API_BASE_URL.replace(/\/api$/, "");
 
 export class ApiError extends Error {
   status: number;
@@ -45,7 +46,7 @@ export async function apiFetch<T>(
     });
   } catch (error) {
     throw new ApiError(
-      "Backend API is unavailable. Start the backend service on http://localhost:4000 and try again.",
+      `Backend API is unavailable. Verify the backend service is reachable at ${API_BASE_LABEL} and try again.`,
       503,
       error,
     );
@@ -89,7 +90,7 @@ export async function apiDownload(
     });
   } catch (error) {
     throw new ApiError(
-      "Backend API is unavailable. Start the backend service on http://localhost:4000 and try again.",
+      `Backend API is unavailable. Verify the backend service is reachable at ${API_BASE_LABEL} and try again.`,
       503,
       error,
     );
@@ -123,6 +124,10 @@ export async function apiDownload(
 
 export function isBackendUnavailable(error: unknown) {
   return error instanceof ApiError && error.status === 503;
+}
+
+export function getApiBaseLabel() {
+  return API_BASE_LABEL;
 }
 
 function tryParseJson(value: string) {

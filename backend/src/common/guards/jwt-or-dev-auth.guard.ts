@@ -33,7 +33,10 @@ export class JwtOrDevAuthGuard implements CanActivate {
       }
     }
 
-    const devBypass = this.configService.get<string>("AUTH_DEV_BYPASS") === "true";
+    const isProduction =
+      this.configService.get<string>("NODE_ENV", "development").toLowerCase() === "production";
+    const devBypass =
+      !isProduction && this.configService.get<string>("AUTH_DEV_BYPASS") === "true";
     if (!devBypass) {
       throw new UnauthorizedException("Authentication token is required");
     }

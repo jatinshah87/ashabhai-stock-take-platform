@@ -26,11 +26,23 @@ export class AuthService {
     });
 
     if (!user || user.status !== "active") {
+      await this.auditLogService.log({
+        action: "LOGIN_FAILED",
+        entityType: "AUTH",
+        metadata: { email: dto.email.toLowerCase(), reason: "user_not_found_or_inactive" },
+      });
       throw new UnauthorizedException("Invalid credentials");
     }
 
     const passwordMatches = await compare(dto.password, user.passwordHash);
     if (!passwordMatches) {
+      await this.auditLogService.log({
+        actorUserId: user.id,
+        action: "LOGIN_FAILED",
+        entityType: "AUTH",
+        entityId: user.id,
+        metadata: { email: user.email, reason: "password_mismatch" },
+      });
       throw new UnauthorizedException("Invalid credentials");
     }
 
@@ -44,7 +56,7 @@ export class AuthService {
 
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>("JWT_SECRET"),
-      expiresIn: this.configService.get<string>("JWT_EXPIRES_IN", "8h"),
+      expiresIn: this.configService.get<string>("JWT_EXPIRES_IN", "8h") as never,
     });
 
     await this.auditLogService.log({

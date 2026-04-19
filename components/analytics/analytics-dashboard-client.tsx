@@ -55,7 +55,7 @@ import {
 } from "@/lib/services/analytics";
 import { getPlanningReferenceData, getPlans } from "@/lib/services/stocktake";
 import { getAnomalySummary } from "@/lib/services/anomalies";
-import { isBackendUnavailable } from "@/lib/api/http";
+import { getApiBaseLabel, isBackendUnavailable } from "@/lib/api/http";
 import { getStoredAppRole } from "@/lib/services/session";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -207,7 +207,7 @@ export function AnalyticsDashboardClient({
         if (!active) return;
         setError(
           isBackendUnavailable(loadError)
-            ? "Analytics requires the backend API and database. Start the NestJS backend on http://localhost:4000 to load live KPI and BI data."
+            ? `Analytics requires a reachable backend API and database. Verify ${getApiBaseLabel()} is online and configured correctly.`
             : loadError instanceof Error
               ? loadError.message
               : "Unable to load analytics.",

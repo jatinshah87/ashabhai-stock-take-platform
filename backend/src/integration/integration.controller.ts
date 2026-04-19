@@ -3,6 +3,7 @@ import { ROLE_CODES } from "src/common/constants/role-codes";
 import { CurrentUser, CurrentUserPayload } from "src/common/decorators/current-user.decorator";
 import { Roles } from "src/common/decorators/roles.decorator";
 import { JwtOrDevAuthGuard } from "src/common/guards/jwt-or-dev-auth.guard";
+import { AdminImportRateLimitGuard } from "src/common/guards/rate-limit.guard";
 import { RolesGuard } from "src/common/guards/roles.guard";
 import { QueryImportJobsDto } from "./dto/import-common.dto";
 import { ImportItemBarcodesDto } from "./dto/import-item-barcode.dto";
@@ -15,7 +16,7 @@ import { ImportWarehousesDto } from "./dto/import-warehouse.dto";
 import { IntegrationService } from "./integration.service";
 
 @Controller("integration")
-@UseGuards(JwtOrDevAuthGuard, RolesGuard)
+@UseGuards(JwtOrDevAuthGuard, RolesGuard, AdminImportRateLimitGuard)
 @Roles(ROLE_CODES.SYSTEM_ADMIN)
 export class IntegrationController {
   constructor(private readonly integrationService: IntegrationService) {}

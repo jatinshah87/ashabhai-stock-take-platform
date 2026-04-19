@@ -12,6 +12,12 @@ import { businessUsers } from "@/lib/mock-data";
 import { isBackendUnavailable } from "@/lib/api/http";
 import { login } from "@/lib/services/auth";
 
+function allowOfflineDemoFallback() {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  return host === "localhost" || host === "127.0.0.1";
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("harshil.patel@ashabhai.co");
@@ -38,7 +44,7 @@ export default function LoginPage() {
       router.push(destination);
       router.refresh();
     } catch (loginError) {
-      if (isBackendUnavailable(loginError)) {
+      if (isBackendUnavailable(loginError) && allowOfflineDemoFallback()) {
         const fallbackUser = businessUsers.find(
           (item) => item.email.toLowerCase() === email.trim().toLowerCase(),
         );
