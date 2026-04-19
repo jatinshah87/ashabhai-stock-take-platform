@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { LoaderCircle, RefreshCcw } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionCard } from "@/components/shared/section-card";
@@ -13,7 +12,6 @@ import { getSyncSummary, processOfflineQueue } from "@/lib/services/sync";
 import { SyncSummary } from "@/lib/types";
 
 export function SyncStatusClient() {
-  const searchParams = useSearchParams();
   const [summary, setSummary] = useState<(SyncSummary & { backendUnavailable?: boolean; localPending: number }) | null>(null);
   const [localQueueCount, setLocalQueueCount] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
@@ -30,7 +28,8 @@ export function SyncStatusClient() {
 
   useEffect(() => {
     setRole(getStoredAppRole());
-    if (searchParams.get("queuedSubmission") === "1") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("queuedSubmission") === "1") {
       setMessage("Submission was queued locally and will sync when connectivity is restored.");
     }
 
@@ -52,7 +51,7 @@ export function SyncStatusClient() {
       window.removeEventListener("ashabhai-sync-queue", handler);
       window.removeEventListener("storage", handler);
     };
-  }, [searchParams]);
+  }, []);
 
   async function handleRetry() {
     setIsRetrying(true);
