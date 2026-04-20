@@ -39,6 +39,6 @@
     "typescript": "^5.7.2"
   },
   "prisma": {
-    "seed": "ts-node --skipProject --transpile-only prisma/seed.ts"
+    "seed": "ts-node --skipProject --transpile-only --compiler-options \"{\\\"module\\\":\\\"commonjs\\\",\\\"moduleResolution\\\":\\\"node\\\"}\" prisma/seed.ts"
   }
 }
