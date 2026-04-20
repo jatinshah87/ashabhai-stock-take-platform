@@ -21,7 +21,7 @@ type RecordOutcome = {
   status: ImportRecordStatus;
   message?: string;
   externalKey?: string;
-  payload?: Record<string, unknown>;
+  payload?: Prisma.InputJsonValue;
 };
 
 @Injectable()
@@ -175,7 +175,7 @@ export class IntegrationService {
     });
   }
 
-  private async runImport<TRecord extends Record<string, unknown>>(params: {
+  private async runImport<TRecord extends object>(params: {
     importType: ImportType;
     sourceSystem: string;
     sourceLabel?: string;
@@ -732,26 +732,30 @@ export class IntegrationService {
     };
   }
 
-  private hasDifferences(
-    current: Record<string, unknown>,
-    next: Record<string, unknown>,
+  private hasDifferences<TCurrent extends object, TNext extends object>(
+    current: TCurrent,
+    next: TNext,
   ) {
-    return Object.entries(next).some(([key, value]) => current[key] !== value);
+    const currentRecord = current as Record<string, unknown>;
+    return Object.entries(next as Record<string, unknown>).some(
+      ([key, value]) => currentRecord[key] !== value,
+    );
   }
 
-  private getExternalKey(importType: ImportType, record: Record<string, unknown>) {
-    if (importType === ImportType.WAREHOUSE) return String(record.code ?? "");
-    if (importType === ImportType.SITE) return `${record.warehouseCode ?? ""}:${record.code ?? ""}`;
+  private getExternalKey(importType: ImportType, record: object) {
+    const value = record as Record<string, unknown>;
+    if (importType === ImportType.WAREHOUSE) return String(value.code ?? "");
+    if (importType === ImportType.SITE) return `${value.warehouseCode ?? ""}:${value.code ?? ""}`;
     if (importType === ImportType.LOCATION) {
-      return `${record.warehouseCode ?? ""}:${record.siteCode ?? ""}:${record.code ?? ""}`;
+      return `${value.warehouseCode ?? ""}:${value.siteCode ?? ""}:${value.code ?? ""}`;
     }
-    if (importType === ImportType.ITEM) return String(record.code ?? "");
-    if (importType === ImportType.ITEM_BARCODE) return String(record.barcode ?? "");
-    if (importType === ImportType.ITEM_UOM) return `${record.itemCode ?? ""}:${record.uomCode ?? ""}`;
-    return `${record.locationCode ?? ""}:${record.itemCode ?? ""}:${record.uomCode ?? ""}`;
+    if (importType === ImportType.ITEM) return String(value.code ?? "");
+    if (importType === ImportType.ITEM_BARCODE) return String(value.barcode ?? "");
+    if (importType === ImportType.ITEM_UOM) return `${value.itemCode ?? ""}:${value.uomCode ?? ""}`;
+    return `${value.locationCode ?? ""}:${value.itemCode ?? ""}:${value.uomCode ?? ""}`;
   }
 
-  private toJsonValue(value: Record<string, unknown>) {
-    return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+  private toJsonValue(value: unknown) {
+    return JSON.parse(JSON.stringify(value ?? {})) as Prisma.InputJsonValue;
   }
 }

@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { AuditLogService } from "src/audit-log/audit-log.service";
-import { ROLE_CODES } from "src/common/constants/role-codes";
+import { ROLE_CODES, RoleCode } from "src/common/constants/role-codes";
 import { CurrentUserPayload } from "src/common/decorators/current-user.decorator";
 import { PrismaService } from "src/prisma/prisma.service";
 import { CreateStockTakePlanDto } from "./dto/create-stock-take-plan.dto";
@@ -159,26 +159,11 @@ export class StockTakePlansService {
     };
 
     await this.validatePlan({
-      name: merged.name,
-      code: merged.code,
-      description: merged.description,
       warehouseId: merged.warehouseId,
       siteIds: merged.siteIds,
       locationIds: merged.locationIds,
-      scheduledDate:
-        typeof merged.scheduledDate === "string"
-          ? merged.scheduledDate
-          : merged.scheduledDate.toISOString(),
-      scheduleWindow: merged.scheduleWindow,
       firstCountUserId: merged.firstCountUserId,
       secondCountUserId: merged.secondCountUserId,
-      notes: merged.notes,
-      instructions: merged.instructions,
-      countMethod: merged.countMethod,
-      locked: dto.locked ?? existing.locked,
-      highVariancePlaceholder:
-        dto.highVariancePlaceholder ?? existing.highVariancePlaceholder,
-      status: merged.status,
     });
 
     let plan;
@@ -318,14 +303,13 @@ export class StockTakePlansService {
       throw new BadRequestException("Assigned count users are invalid or inactive");
     }
 
-    if (
-      countUsers.some(
-        (user) =>
-          ![ROLE_CODES.SYSTEM_ADMIN, ROLE_CODES.AUDITOR, ROLE_CODES.WAREHOUSE_USER].includes(
-            user.role.code as string,
-          ),
-      )
-    ) {
+    const supportedRoles: RoleCode[] = [
+      ROLE_CODES.SYSTEM_ADMIN,
+      ROLE_CODES.AUDITOR,
+      ROLE_CODES.WAREHOUSE_USER,
+    ];
+
+    if (countUsers.some((user) => !supportedRoles.includes(user.role.code as RoleCode))) {
       throw new BadRequestException("Assigned count users have unsupported roles");
     }
   }

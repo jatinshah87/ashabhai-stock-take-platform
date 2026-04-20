@@ -23,6 +23,13 @@ import { QuerySyncQueueDto } from "./dto/query-sync-queue.dto";
 import { ResolveSyncConflictDto } from "./dto/resolve-sync-conflict.dto";
 import { SyncBatchDto, SyncBatchRecordDto } from "./dto/sync-batch.dto";
 
+type ApplyQueueRecordResult = {
+  syncStatus: "CONFLICT" | "PROCESSED" | "SKIPPED";
+  message: string;
+  conflictId?: string;
+  serverEntryId?: string;
+};
+
 @Injectable()
 export class SyncService {
   constructor(
@@ -261,7 +268,7 @@ export class SyncService {
 
     if (dto.resolutionAction === "KEEP_LOCAL" || dto.resolutionAction === "RETRY_REPLAY") {
       const replay = await this.applyQueueRecord(conflict.syncQueue, actor, true);
-      if (replay.syncStatus === SyncStatus.CONFLICT || replay.syncStatus === SyncStatus.FAILED) {
+      if (replay.syncStatus === SyncStatus.CONFLICT) {
         throw new BadRequestException(replay.message);
       }
       return this.completeConflict(
@@ -450,7 +457,7 @@ export class SyncService {
     },
     actor: CurrentUserPayload,
     forceReplay: boolean,
-  ) {
+  ): Promise<ApplyQueueRecordResult> {
     const plan = await this.prisma.stockTakePlan.findUnique({
       where: { id: queue.planId },
       include: {
