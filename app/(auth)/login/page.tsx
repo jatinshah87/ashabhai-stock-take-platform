@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { businessUsers } from "@/lib/mock-data";
 import { isBackendUnavailable } from "@/lib/api/http";
 import { login } from "@/lib/services/auth";
+import { storeSession } from "@/lib/services/session";
 
 function allowOfflineDemoFallback() {
   if (typeof window === "undefined") return false;
@@ -31,8 +32,7 @@ export default function LoginPage() {
 
     try {
       const response = await login({ email, password });
-      window.localStorage.setItem("ashabhai_access_token", response.accessToken);
-      window.localStorage.setItem("ashabhai_current_user", JSON.stringify(response.user));
+      storeSession(response.accessToken, response.user);
 
       const destination =
         response.user.role === "WAREHOUSE_USER"
@@ -64,8 +64,7 @@ export default function LoginPage() {
             warehouseIds: [fallbackUser.warehouseId],
             siteIds: fallbackUser.siteIds,
           };
-          window.localStorage.setItem("ashabhai_access_token", "demo-offline-session");
-          window.localStorage.setItem("ashabhai_current_user", JSON.stringify(demoUser));
+          storeSession("demo-offline-session", demoUser);
           router.push(roleCode === "WAREHOUSE_USER" ? "/stocktake/my-plans" : roleCode === "AUDITOR" ? "/auditor" : "/admin");
           router.refresh();
           return;

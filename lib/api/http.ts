@@ -1,6 +1,7 @@
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:4000/api";
 const API_BASE_LABEL = API_BASE_URL.replace(/\/api$/, "");
+const ACCESS_TOKEN_COOKIE = "ashabhai_access_token";
 
 export class ApiError extends Error {
   status: number;
@@ -35,7 +36,7 @@ export async function apiFetch<T>(
     searchParams?: Record<string, string | number | undefined>;
   },
 ): Promise<T> {
-  const headers = buildHeaders(init?.headers, true);
+  const headers = await buildHeaders(init?.headers, true);
   let response: Response;
 
   try {
@@ -79,7 +80,7 @@ export async function apiDownload(
     searchParams?: Record<string, string | number | undefined>;
   },
 ) {
-  const headers = buildHeaders(init?.headers, false);
+  const headers = await buildHeaders(init?.headers, false);
   let response: Response;
 
   try {
@@ -138,22 +139,28 @@ function tryParseJson(value: string) {
   }
 }
 
-function getAuthHeaders() {
+async function getAuthHeaders() {
   const headers: Record<string, string> = {};
   if (typeof window === "undefined") {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const token = cookieStore.get(ACCESS_TOKEN_COOKIE)?.value;
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
     return headers;
   }
 
-  const token = window.localStorage.getItem("ashabhai_access_token");
+  const token = window.localStorage.getItem(ACCESS_TOKEN_COOKIE);
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
   return headers;
 }
 
-function buildHeaders(initHeaders?: HeadersInit, includeJson = false): Headers {
+async function buildHeaders(initHeaders?: HeadersInit, includeJson = false): Promise<Headers> {
   const headers = new Headers(initHeaders);
-  const authHeaders = getAuthHeaders();
+  const authHeaders = await getAuthHeaders();
 
   Object.entries(authHeaders).forEach(([key, value]) => {
     headers.set(key, value);

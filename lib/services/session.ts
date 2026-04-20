@@ -1,11 +1,14 @@
 import { AppRole, AuthenticatedUser } from "@/lib/types";
 
+const ACCESS_TOKEN_KEY = "ashabhai_access_token";
+const CURRENT_USER_KEY = "ashabhai_current_user";
+
 export function getStoredUser(): AuthenticatedUser | null {
   if (typeof window === "undefined") {
     return null;
   }
 
-  const raw = window.localStorage.getItem("ashabhai_current_user");
+  const raw = window.localStorage.getItem(CURRENT_USER_KEY);
   if (!raw) {
     return null;
   }
@@ -22,8 +25,9 @@ export function clearStoredSession() {
     return;
   }
 
-  window.localStorage.removeItem("ashabhai_access_token");
-  window.localStorage.removeItem("ashabhai_current_user");
+  window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+  window.localStorage.removeItem(CURRENT_USER_KEY);
+  document.cookie = `${ACCESS_TOKEN_KEY}=; path=/; max-age=0; SameSite=Lax`;
 }
 
 export function hasStoredSession() {
@@ -32,9 +36,20 @@ export function hasStoredSession() {
   }
 
   return Boolean(
-    window.localStorage.getItem("ashabhai_access_token") &&
-      window.localStorage.getItem("ashabhai_current_user"),
+    window.localStorage.getItem(ACCESS_TOKEN_KEY) &&
+      window.localStorage.getItem(CURRENT_USER_KEY),
   );
+}
+
+export function storeSession(accessToken: string, user: AuthenticatedUser) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  window.localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${ACCESS_TOKEN_KEY}=${encodeURIComponent(accessToken)}; path=/; max-age=28800; SameSite=Lax${secure}`;
 }
 
 export function getStoredAppRole(): AppRole | null {
